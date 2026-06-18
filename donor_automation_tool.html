@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Donor Processing Tool</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; color: #1a1a18; min-height: 100vh; padding: 2rem 1rem; }
+  .page { max-width: 720px; margin: 0 auto; }
+  header { margin-bottom: 2rem; }
+  header h1 { font-size: 22px; font-weight: 600; color: #1a1a18; }
+  header p { font-size: 14px; color: #666; margin-top: 4px; }
+  .card { background: #fff; border: 1px solid #e5e5e2; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; }
+  .step-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .step-num { width: 26px; height: 26px; border-radius: 50%; background: #1a1a18; color: #fff; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .step-header h2 { font-size: 15px; font-weight: 600; color: #1a1a18; }
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+  .field-grid.triple { grid-template-columns: 1fr 1fr 1fr; }
+  .field-grid.full { grid-template-columns: 1fr; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; font-weight: 500; color: #888; text-transform: uppercase; letter-spacing: 0.04em; }
+  .field input, .field select, .field textarea {
+    font-size: 14px; padding: 8px 10px;
+    border: 1px solid #ddd; border-radius: 8px;
+    background: #fafaf9; color: #1a1a18;
+    width: 100%; outline: none; font-family: inherit;
+    transition: border-color 0.15s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: #1a1a18; }
+  .field textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
+  .divider { height: 1px; background: #e5e5e2; margin: 1rem 0; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all 0.15s; border: 1px solid #ddd; background: #fff; color: #1a1a18; }
+  .btn:hover { background: #f5f5f3; }
+  .btn.primary { background: #1a1a18; color: #fff; border-color: #1a1a18; }
+  .btn.primary:hover { background: #333; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 20px; }
+  .badge.pass { background: #e6f4ea; color: #1e7e34; }
+  .badge.fail { background: #fce8e6; color: #c5221f; }
+  .badge.warn { background: #fef7e0; color: #b06000; }
+  .badge.neutral { background: #f0efed; color: #888; }
+  .screen-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid #f0efed; }
+  .screen-row:last-child { border-bottom: none; }
+  .screen-label { font-size: 14px; font-weight: 500; }
+  .screen-detail { font-size: 12px; color: #888; margin-top: 2px; }
+  .verdict-row { display: flex; align-items: center; justify-content: space-between; padding-top: 14px; margin-top: 4px; border-top: 1px solid #e5e5e2; }
+  .verdict-label { font-size: 15px; font-weight: 600; }
+  .msg { font-size: 13px; padding: 10px 14px; border-radius: 8px; margin-top: 12px; }
+  .msg.success { background: #e6f4ea; color: #1e7e34; }
+  .msg.error { background: #fce8e6; color: #c5221f; }
+  .msg.info { background: #e8f0fe; color: #1a56db; }
+  .hint { font-size: 13px; color: #888; line-height: 1.6; margin-bottom: 14px; }
+  .hint a { color: #1a56db; }
+  code { font-size: 12px; background: #f0efed; padding: 2px 6px; border-radius: 4px; }
+  #screening-section { display: none; }
+  #write-section { display: none; }
+  .extract-hint { background: #f0efed; border-radius: 8px; padding: 12px 14px; font-size: 13px; color: #555; line-height: 1.6; margin-bottom: 14px; }
+  .extract-hint strong { color: #1a1a18; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <h1>Donor Processing Tool</h1>
+    <p>Extract, screen, and write donor data to Google Sheets — step by step.</p>
+  </header>
+
+  <!-- Step 1 -->
+  <div class="card">
+    <div class="step-header">
+      <div class="step-num">1</div>
+      <h2>Paste Claude's JSON output</h2>
+    </div>
+    <div class="extract-hint">
+      Upload the donor PDF in your Claude chat and ask Claude to extract the fields. Then paste the JSON response here — all fields will be auto-filled instantly.
+    </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label>Paste JSON here</label>
+      <textarea id="jsonInput" placeholder='{"tissueBank":"Medcure","donorId":"2606144F","age":"58",...}' style="min-height:90px; font-family: monospace; font-size:13px;"></textarea>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button class="btn primary" onclick="autoFill()">⚡ Auto-fill form</button>
+      <span id="autofill-msg" style="font-size:13px; color:#888;"></span>
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="card">
+    <div class="step-header">
+      <div class="step-num">2</div>
+      <h2>Fill in donor details</h2>
+    </div>
+
+    <div class="field-grid" style="margin-bottom:10px;">
+      <div class="field"><label>Tissue bank</label><input id="tissueBank" type="text" placeholder="e.g. Medcure"></div>
+      <div class="field"><label>Donor ID</label><input id="donorId" type="text" placeholder="e.g. 2606124F"></div>
+    </div>
+
+    <div class="field-grid triple" style="margin-bottom:10px;">
+      <div class="field"><label>Age (yrs)</label><input id="age" type="number" placeholder="67"></div>
+      <div class="field"><label>Gender</label>
+        <select id="gender"><option value="">—</option><option>M</option><option>F</option></select>
+      </div>
+      <div class="field"><label>Race / ethnicity</label><input id="race" type="text" placeholder="Cauc., Hisp."></div>
+    </div>
+
+    <div class="field-grid triple" style="margin-bottom:10px;">
+      <div class="field"><label>Height (in)</label><input id="height" type="number" placeholder="67"></div>
+      <div class="field"><label>Weight (lbs)</label><input id="weight" type="number" placeholder="150"></div>
+      <div class="field"><label>BMI</label><input id="bmi" type="number" step="0.01" placeholder="23.49"></div>
+    </div>
+
+    <div class="field-grid" style="margin-bottom:10px;">
+      <div class="field"><label>Cause of death</label><input id="cod" type="text" placeholder="Cardio Pulmonary Arrest"></div>
+      <div class="field"><label>Location</label><input id="location" type="text" placeholder="Optional"></div>
+    </div>
+
+    <div class="field-grid full" style="margin-bottom:10px;">
+      <div class="field"><label>Medical / social history</label>
+        <textarea id="medHistory" placeholder="Conditions, surgeries, vices, medications..."></textarea>
+      </div>
+    </div>
+
+    <div class="field-grid" style="margin-bottom:10px;">
+      <div class="field"><label>Serology</label>
+        <select id="serology">
+          <option value="">—</option>
+          <option value="Non-Reactive">Non-Reactive (all clear)</option>
+          <option value="Reactive">Reactive (any positive)</option>
+        </select>
+      </div>
+      <div class="field"><label>Osteoporosis risk factor count</label>
+        <input id="osteoCount" type="number" min="0" max="10" placeholder="0">
+      </div>
+    </div>
+
+    <div class="field-grid full" style="margin-bottom:14px;">
+      <div class="field"><label>Structural malformation notes</label>
+        <input id="structural" type="text" placeholder="e.g. None in lumbar/sacral/pelvis/hip">
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <button class="btn primary" onclick="runScreening()">&#10003; Run screening</button>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="card" id="screening-section">
+    <div class="step-header">
+      <div class="step-num">3</div>
+      <h2>Screening results</h2>
+    </div>
+    <div id="screening-rows"></div>
+    <div class="verdict-row">
+      <span class="verdict-label">Overall verdict</span>
+      <span id="overall-badge" class="badge neutral">—</span>
+    </div>
+  </div>
+
+  <!-- Step 4 -->
+  <div class="card" id="write-section">
+    <div class="step-header">
+      <div class="step-num">4</div>
+      <h2>Write to Google Sheet</h2>
+    </div>
+    <p class="hint">
+      Get a short-lived access token from <a href="https://developers.google.com/oauthplayground" target="_blank">OAuth Playground</a>
+      using scope <code>https://www.googleapis.com/auth/spreadsheets</code>, then paste it below.
+    </p>
+    <div class="field" style="margin-bottom:14px;">
+      <label>OAuth access token</label>
+      <input id="token" type="password" placeholder="ya29.xxxxx...">
+    </div>
+    <div class="btn-row">
+      <button class="btn primary" id="write-btn" onclick="writeToSheet()">&#43; Add row to sheet</button>
+      <button class="btn" onclick="copyTSV()">&#128203; Copy row as TSV</button>
+    </div>
+    <div id="write-msg"></div>
+  </div>
+
+</div>
+
+<script>
+const SHEET_ID = '1s1YTnlNDYpkRIGRUeDNo0ffp2c3xgavfGPMcE8uYzYw';
+let rowData = [];
+let screeningResult = '';
+
+function autoFill() {
+  const raw = document.getElementById('jsonInput').value.trim();
+  const msgEl = document.getElementById('autofill-msg');
+  let d;
+  try {
+    // Strip markdown code fences if present
+    const clean = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    d = JSON.parse(clean);
+  } catch(e) {
+    msgEl.style.color = '#c5221f';
+    msgEl.textContent = 'Invalid JSON — please paste the full JSON block from Claude.';
+    return;
+  }
+  if (d.tissueBank !== undefined) document.getElementById('tissueBank').value = d.tissueBank;
+  if (d.donorId !== undefined) document.getElementById('donorId').value = d.donorId;
+  if (d.age !== undefined) document.getElementById('age').value = d.age;
+  if (d.gender !== undefined) document.getElementById('gender').value = d.gender;
+  if (d.heightIn !== undefined) document.getElementById('height').value = d.heightIn;
+  if (d.weightLbs !== undefined) document.getElementById('weight').value = d.weightLbs;
+  if (d.bmi !== undefined) document.getElementById('bmi').value = d.bmi;
+  if (d.race !== undefined) document.getElementById('race').value = d.race;
+  if (d.location !== undefined) document.getElementById('location').value = d.location;
+  if (d.cod !== undefined) document.getElementById('cod').value = d.cod;
+  if (d.medHistory !== undefined) document.getElementById('medHistory').value = d.medHistory;
+  if (d.serology !== undefined) {
+    const sel = document.getElementById('serology');
+    sel.value = d.serology === 'Non-Reactive' ? 'Non-Reactive' : 'Reactive';
+  }
+  if (d.osteoCount !== undefined) document.getElementById('osteoCount').value = d.osteoCount;
+  if (d.structuralMalformation !== undefined) document.getElementById('structural').value = d.structuralMalformation;
+  msgEl.style.color = '#1e7e34';
+  msgEl.textContent = '✓ All fields filled! Review below, then run screening.';
+  document.getElementById('tissueBank').closest('.card').nextElementSibling.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function val(id) { return (document.getElementById(id).value || '').trim(); }
+
+function runScreening() {
+  const age = parseFloat(val('age'));
+  const bmi = parseFloat(val('bmi'));
+  const serology = val('serology');
+  const osteo = parseInt(val('osteoCount')) || 0;
+  const structural = val('structural').toLowerCase();
+
+  const checks = [];
+  let pass = true;
+  let dexNeeded = false;
+  const failReasons = [];
+
+  // Serology
+  const serOk = serology === 'Non-Reactive';
+  checks.push({ label: 'Serology', detail: serology || 'Not specified', status: serOk ? 'pass' : 'fail', badge: serOk ? 'Pass' : 'Fail' });
+  if (!serOk) { pass = false; failReasons.push('positive serology'); }
+
+  // Age
+  const ageOk = !isNaN(age) && age >= 26 && age <= 70;
+  checks.push({ label: 'Age (26–70 yrs)', detail: isNaN(age) ? 'Not entered' : age + ' years', status: ageOk ? 'pass' : 'fail', badge: ageOk ? 'Pass' : 'Fail' });
+  if (!ageOk) { pass = false; failReasons.push('age out of range'); }
+
+  // BMI
+  const bmiOk = !isNaN(bmi) && bmi >= 18.5 && bmi <= 40;
+  checks.push({ label: 'BMI (18.5–40)', detail: isNaN(bmi) ? 'Not entered' : bmi.toFixed(2), status: bmiOk ? 'pass' : 'fail', badge: bmiOk ? 'Pass' : 'Fail' });
+  if (!bmiOk) { pass = false; failReasons.push('BMI out of range'); }
+
+  // Osteoporosis
+  const osteoOk = osteo <= 3;
+  if (!osteoOk) { pass = false; failReasons.push('osteoporosis factor count >3'); }
+  if (osteoOk && osteo >= 1) dexNeeded = true;
+  const osteoStatus = !osteoOk ? 'fail' : osteo >= 1 ? 'warn' : 'pass';
+  const osteoBadge = !osteoOk ? 'Fail' : osteo >= 1 ? 'DEX recommended' : 'Pass';
+  checks.push({ label: 'Osteoporosis risk (≤3 factors)', detail: osteo + ' factor' + (osteo !== 1 ? 's' : '') + ' identified', status: osteoStatus, badge: osteoBadge });
+
+  // Structural
+  const badStructural = structural && (
+    structural.includes('lumbar') || structural.includes('sacr') ||
+    structural.includes('pelv') || structural.includes('hip') || structural.includes('spine')
+  ) && !structural.startsWith('none');
+  checks.push({ label: 'Structural malformation', detail: val('structural') || 'Not specified', status: badStructural ? 'fail' : 'pass', badge: badStructural ? 'Fail' : 'Pass' });
+  if (badStructural) { pass = false; failReasons.push('structural issue in excluded region'); }
+
+  // Render
+  document.getElementById('screening-rows').innerHTML = checks.map(c => `
+    <div class="screen-row">
+      <div>
+        <div class="screen-label">${c.label}</div>
+        <div class="screen-detail">${c.detail}</div>
+      </div>
+      <span class="badge ${c.status}">${c.badge}</span>
+    </div>
+  `).join('');
+
+  if (pass && dexNeeded) {
+    screeningResult = 'Pass - DEX scan recommended';
+    document.getElementById('overall-badge').className = 'badge warn';
+    document.getElementById('overall-badge').textContent = 'Pass — DEX scan recommended';
+  } else if (pass) {
+    screeningResult = 'Pass';
+    document.getElementById('overall-badge').className = 'badge pass';
+    document.getElementById('overall-badge').textContent = 'Pass';
+  } else {
+    screeningResult = 'Fail — ' + failReasons.join('; ');
+    document.getElementById('overall-badge').className = 'badge fail';
+    document.getElementById('overall-badge').textContent = 'Fail';
+  }
+
+  const heightIn = parseFloat(val('height'));
+  rowData = [
+    val('tissueBank'), val('donorId'), '',
+    val('age'), val('gender'),
+    isNaN(heightIn) ? val('height') : Math.round(heightIn).toString(),
+    val('weight'),
+    isNaN(bmi) ? val('bmi') : bmi.toFixed(2),
+    val('race'), val('location'), val('cod'),
+    val('medHistory'), serology,
+    val('osteoCount'), val('structural'), screeningResult
+  ];
+
+  document.getElementById('screening-section').style.display = 'block';
+  document.getElementById('write-section').style.display = 'block';
+  document.getElementById('screening-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function writeToSheet() {
+  const token = document.getElementById('token').value.trim();
+  const msgEl = document.getElementById('write-msg');
+  if (!token) { msgEl.className = 'msg error'; msgEl.textContent = 'Please paste an OAuth access token first.'; return; }
+  const btn = document.getElementById('write-btn');
+  btn.disabled = true; btn.textContent = 'Writing...';
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Sheet1!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: [rowData] })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msgEl.className = 'msg success';
+      msgEl.textContent = '✓ Row successfully added to your Google Sheet!';
+    } else {
+      msgEl.className = 'msg error';
+      msgEl.textContent = 'API error: ' + (data.error?.message || JSON.stringify(data));
+    }
+  } catch(e) {
+    msgEl.className = 'msg error';
+    msgEl.textContent = 'Network error (' + e.message + '). Use "Copy row as TSV" and paste manually instead.';
+  }
+  btn.disabled = false; btn.textContent = '+ Add row to sheet';
+}
+
+function copyTSV() {
+  const tsv = rowData.join('\t');
+  navigator.clipboard.writeText(tsv).then(() => {
+    const msgEl = document.getElementById('write-msg');
+    msgEl.className = 'msg success';
+    msgEl.textContent = '✓ Copied! Click the first empty cell in your sheet and paste.';
+  }).catch(() => {
+    const msgEl = document.getElementById('write-msg');
+    msgEl.className = 'msg error';
+    msgEl.textContent = 'Could not copy automatically — please copy this manually: ' + rowData.join('\t');
+  });
+}
+</script>
+</body>
+</html>
