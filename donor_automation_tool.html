@@ -9,12 +9,12 @@
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; color: #1a1a18; min-height: 100vh; padding: 2rem 1rem; }
   .page { max-width: 720px; margin: 0 auto; }
   header { margin-bottom: 2rem; }
-  header h1 { font-size: 22px; font-weight: 600; color: #1a1a18; }
+  header h1 { font-size: 22px; font-weight: 600; }
   header p { font-size: 14px; color: #666; margin-top: 4px; }
   .card { background: #fff; border: 1px solid #e5e5e2; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; }
   .step-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
   .step-num { width: 26px; height: 26px; border-radius: 50%; background: #1a1a18; color: #fff; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .step-header h2 { font-size: 15px; font-weight: 600; color: #1a1a18; }
+  .step-header h2 { font-size: 15px; font-weight: 600; }
   .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
   .field-grid.triple { grid-template-columns: 1fr 1fr 1fr; }
   .field-grid.full { grid-template-columns: 1fr; }
@@ -56,8 +56,24 @@
   code { font-size: 12px; background: #f0efed; padding: 2px 6px; border-radius: 4px; }
   #screening-section { display: none; }
   #write-section { display: none; }
-  .extract-hint { background: #f0efed; border-radius: 8px; padding: 12px 14px; font-size: 13px; color: #555; line-height: 1.6; margin-bottom: 14px; }
-  .extract-hint strong { color: #1a1a18; }
+
+  /* PDF upload drop zone */
+  .drop-zone {
+    border: 2px dashed #ddd; border-radius: 10px;
+    padding: 2rem 1rem; text-align: center;
+    cursor: pointer; transition: all 0.2s;
+    background: #fafaf9; margin-bottom: 12px;
+    position: relative;
+  }
+  .drop-zone:hover, .drop-zone.dragover { border-color: #1a1a18; background: #f0efed; }
+  .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .drop-zone .dz-icon { font-size: 28px; margin-bottom: 8px; }
+  .drop-zone .dz-label { font-size: 14px; font-weight: 500; color: #1a1a18; }
+  .drop-zone .dz-sub { font-size: 12px; color: #888; margin-top: 4px; }
+  .drop-zone.has-file { border-color: #1e7e34; border-style: solid; background: #f0fdf4; }
+  .drop-zone.has-file .dz-label { color: #1e7e34; }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -65,40 +81,38 @@
 
   <header>
     <h1>Donor Processing Tool</h1>
-    <p>Extract, screen, and write donor data to Google Sheets — step by step.</p>
+    <p>Upload a donor PDF — Claude extracts, screens, and writes to your Google Sheet automatically.</p>
   </header>
 
-  <!-- Step 1 -->
+  <!-- Step 1: PDF Upload -->
   <div class="card">
     <div class="step-header">
       <div class="step-num">1</div>
-      <h2>Paste Claude's JSON output</h2>
+      <h2>Upload donor PDF</h2>
     </div>
-    <div class="extract-hint">
-      Upload the donor PDF in your Claude chat and ask Claude to extract the fields. Then paste the JSON response here — all fields will be auto-filled instantly.
+    <div class="drop-zone" id="dropZone">
+      <input type="file" accept="application/pdf" id="pdfInput" onchange="handleFile(this.files[0])">
+      <div class="dz-icon">📄</div>
+      <div class="dz-label" id="dz-label">Click to upload or drag & drop</div>
+      <div class="dz-sub">Medcure Medical Information Sheet PDF</div>
     </div>
-    <div class="field" style="margin-bottom:10px;">
-      <label>Paste JSON here</label>
-      <textarea id="jsonInput" placeholder='{"tissueBank":"Medcure","donorId":"2606144F","age":"58",...}' style="min-height:90px; font-family: monospace; font-size:13px;"></textarea>
-    </div>
-    <div style="display:flex; gap:8px; align-items:center;">
-      <button class="btn primary" onclick="autoFill()">⚡ Auto-fill form</button>
-      <span id="autofill-msg" style="font-size:13px; color:#888;"></span>
-    </div>
+    <button class="btn primary" id="extractBtn" onclick="extractFromPDF()" disabled>
+      🤖 Extract with Claude
+    </button>
+    <div id="extract-msg"></div>
   </div>
 
-  <!-- Step 2 -->
+  <!-- Step 2: Review fields -->
   <div class="card">
     <div class="step-header">
       <div class="step-num">2</div>
-      <h2>Fill in donor details</h2>
+      <h2>Review extracted fields</h2>
     </div>
 
     <div class="field-grid" style="margin-bottom:10px;">
       <div class="field"><label>Tissue bank</label><input id="tissueBank" type="text" placeholder="e.g. Medcure"></div>
       <div class="field"><label>Donor ID</label><input id="donorId" type="text" placeholder="e.g. 2606124F"></div>
     </div>
-
     <div class="field-grid triple" style="margin-bottom:10px;">
       <div class="field"><label>Age (yrs)</label><input id="age" type="number" placeholder="67"></div>
       <div class="field"><label>Gender</label>
@@ -106,24 +120,20 @@
       </div>
       <div class="field"><label>Race / ethnicity</label><input id="race" type="text" placeholder="Cauc., Hisp."></div>
     </div>
-
     <div class="field-grid triple" style="margin-bottom:10px;">
       <div class="field"><label>Height (in)</label><input id="height" type="number" placeholder="67"></div>
       <div class="field"><label>Weight (lbs)</label><input id="weight" type="number" placeholder="150"></div>
       <div class="field"><label>BMI</label><input id="bmi" type="number" step="0.01" placeholder="23.49"></div>
     </div>
-
     <div class="field-grid" style="margin-bottom:10px;">
       <div class="field"><label>Cause of death</label><input id="cod" type="text" placeholder="Cardio Pulmonary Arrest"></div>
       <div class="field"><label>Location</label><input id="location" type="text" placeholder="Optional"></div>
     </div>
-
     <div class="field-grid full" style="margin-bottom:10px;">
       <div class="field"><label>Medical / social history</label>
         <textarea id="medHistory" placeholder="Conditions, surgeries, vices, medications..."></textarea>
       </div>
     </div>
-
     <div class="field-grid" style="margin-bottom:10px;">
       <div class="field"><label>Serology</label>
         <select id="serology">
@@ -136,18 +146,16 @@
         <input id="osteoCount" type="number" min="0" max="10" placeholder="0">
       </div>
     </div>
-
     <div class="field-grid full" style="margin-bottom:14px;">
       <div class="field"><label>Structural malformation notes</label>
         <input id="structural" type="text" placeholder="e.g. None in lumbar/sacral/pelvis/hip">
       </div>
     </div>
-
     <div class="divider"></div>
-    <button class="btn primary" onclick="runScreening()">&#10003; Run screening</button>
+    <button class="btn primary" onclick="runScreening()">✓ Run screening</button>
   </div>
 
-  <!-- Step 3 -->
+  <!-- Step 3: Screening -->
   <div class="card" id="screening-section">
     <div class="step-header">
       <div class="step-num">3</div>
@@ -160,23 +168,23 @@
     </div>
   </div>
 
-  <!-- Step 4 -->
+  <!-- Step 4: Write to Sheet -->
   <div class="card" id="write-section">
     <div class="step-header">
       <div class="step-num">4</div>
       <h2>Write to Google Sheet</h2>
     </div>
     <p class="hint">
-      Get a short-lived access token from <a href="https://developers.google.com/oauthplayground" target="_blank">OAuth Playground</a>
-      using scope <code>https://www.googleapis.com/auth/spreadsheets</code>, then paste it below.
+      Get a token from <a href="https://developers.google.com/oauthplayground" target="_blank">OAuth Playground</a>
+      using scope <code>https://www.googleapis.com/auth/spreadsheets</code>, then paste below.
     </p>
     <div class="field" style="margin-bottom:14px;">
       <label>OAuth access token</label>
       <input id="token" type="password" placeholder="ya29.xxxxx...">
     </div>
     <div class="btn-row">
-      <button class="btn primary" id="write-btn" onclick="writeToSheet()">&#43; Add row to sheet</button>
-      <button class="btn" onclick="copyTSV()">&#128203; Copy row as TSV</button>
+      <button class="btn primary" id="write-btn" onclick="writeToSheet()">+ Add row to sheet</button>
+      <button class="btn" onclick="copyTSV()">📋 Copy row as TSV</button>
     </div>
     <div id="write-msg"></div>
   </div>
@@ -187,40 +195,122 @@
 const SHEET_ID = '1s1YTnlNDYpkRIGRUeDNo0ffp2c3xgavfGPMcE8uYzYw';
 let rowData = [];
 let screeningResult = '';
+let pdfBase64 = null;
 
-function autoFill() {
-  const raw = document.getElementById('jsonInput').value.trim();
-  const msgEl = document.getElementById('autofill-msg');
-  let d;
-  try {
-    // Strip markdown code fences if present
-    const clean = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-    d = JSON.parse(clean);
-  } catch(e) {
-    msgEl.style.color = '#c5221f';
-    msgEl.textContent = 'Invalid JSON — please paste the full JSON block from Claude.';
+// Drag & drop
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+function handleFile(file) {
+  if (!file || file.type !== 'application/pdf') {
+    showMsg('extract-msg', 'error', 'Please upload a PDF file.');
     return;
   }
-  if (d.tissueBank !== undefined) document.getElementById('tissueBank').value = d.tissueBank;
-  if (d.donorId !== undefined) document.getElementById('donorId').value = d.donorId;
-  if (d.age !== undefined) document.getElementById('age').value = d.age;
-  if (d.gender !== undefined) document.getElementById('gender').value = d.gender;
-  if (d.heightIn !== undefined) document.getElementById('height').value = d.heightIn;
-  if (d.weightLbs !== undefined) document.getElementById('weight').value = d.weightLbs;
-  if (d.bmi !== undefined) document.getElementById('bmi').value = d.bmi;
-  if (d.race !== undefined) document.getElementById('race').value = d.race;
-  if (d.location !== undefined) document.getElementById('location').value = d.location;
-  if (d.cod !== undefined) document.getElementById('cod').value = d.cod;
-  if (d.medHistory !== undefined) document.getElementById('medHistory').value = d.medHistory;
-  if (d.serology !== undefined) {
-    const sel = document.getElementById('serology');
-    sel.value = d.serology === 'Non-Reactive' ? 'Non-Reactive' : 'Reactive';
+  document.getElementById('dz-label').textContent = '📄 ' + file.name;
+  dz.classList.add('has-file');
+  const reader = new FileReader();
+  reader.onload = e => {
+    pdfBase64 = e.target.result.split(',')[1];
+    document.getElementById('extractBtn').disabled = false;
+    showMsg('extract-msg', 'info', 'PDF loaded — click "Extract with Claude" to auto-fill all fields.');
+  };
+  reader.readAsDataURL(file);
+}
+
+async function extractFromPDF() {
+  if (!pdfBase64) return;
+  const btn = document.getElementById('extractBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Extracting...';
+  showMsg('extract-msg', 'info', 'Sending PDF to Claude for extraction...');
+
+  const systemPrompt = `You are a medical data extractor. Extract donor information from the provided PDF and return ONLY valid JSON with no other text, explanation, or markdown. 
+
+Use this exact schema:
+{
+  "tissueBank": "name of tissue bank",
+  "donorId": "donor ID number",
+  "age": "age as number string",
+  "gender": "M or F",
+  "heightIn": "height in inches as number string",
+  "weightLbs": "weight in pounds as number string",
+  "bmi": "BMI as decimal string",
+  "race": "race/ethnicity",
+  "location": "",
+  "cod": "cause of death",
+  "medHistory": "full summary of conditions, surgeries, vices and medications",
+  "serology": "Non-Reactive or Reactive",
+  "osteoCount": "count of osteoporosis risk factors present as number string. Risk factors: chronic smoking or drug abuse, radiation treatment at abdominal region, history of fragility fractures, chemotherapy or medications like Gabapentin, liver cirrhosis, diabetes, kidney failure",
+  "structuralMalformation": "description of structural concerns or 'None in lumbar/sacral/pelvis/hip' if surgeries/cancer are not in those regions"
+}
+
+Height conversion: if given in feet/inches format like 5'7\", convert to total inches (e.g. 67).
+Return ONLY the JSON object. No markdown, no explanation.`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: [{
+          role: 'user',
+          content: [{
+            type: 'document',
+            source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 }
+          }, {
+            type: 'text',
+            text: 'Extract all donor fields from this medical information sheet and return the JSON.'
+          }]
+        }]
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message || 'API error');
+
+    const text = data.content.map(b => b.text || '').join('').trim();
+    const clean = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    const d = JSON.parse(clean);
+    fillForm(d);
+    showMsg('extract-msg', 'success', '✓ All fields extracted and filled! Review below, then run screening.');
+  } catch(e) {
+    showMsg('extract-msg', 'error', 'Extraction failed: ' + e.message);
   }
-  if (d.osteoCount !== undefined) document.getElementById('osteoCount').value = d.osteoCount;
-  if (d.structuralMalformation !== undefined) document.getElementById('structural').value = d.structuralMalformation;
-  msgEl.style.color = '#1e7e34';
-  msgEl.textContent = '✓ All fields filled! Review below, then run screening.';
-  document.getElementById('tissueBank').closest('.card').nextElementSibling.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  btn.disabled = false;
+  btn.innerHTML = '🤖 Extract with Claude';
+}
+
+function fillForm(d) {
+  const set = (id, val) => { if (val !== undefined && val !== null) document.getElementById(id).value = val; };
+  set('tissueBank', d.tissueBank);
+  set('donorId', d.donorId);
+  set('age', d.age);
+  set('race', d.race);
+  set('height', d.heightIn);
+  set('weight', d.weightLbs);
+  set('bmi', d.bmi);
+  set('location', d.location);
+  set('cod', d.cod);
+  set('medHistory', d.medHistory);
+  set('osteoCount', d.osteoCount);
+  set('structural', d.structuralMalformation);
+  if (d.gender) document.getElementById('gender').value = d.gender;
+  if (d.serology) document.getElementById('serology').value = d.serology === 'Non-Reactive' ? 'Non-Reactive' : 'Reactive';
+  document.getElementById('screening-section').style.display = 'none';
+  document.getElementById('write-section').style.display = 'none';
+  document.querySelector('#screening-section').previousElementSibling.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function showMsg(id, type, text) {
+  const el = document.getElementById(id);
+  el.className = 'msg ' + type;
+  el.textContent = text;
 }
 
 function val(id) { return (document.getElementById(id).value || '').trim(); }
@@ -233,26 +323,21 @@ function runScreening() {
   const structural = val('structural').toLowerCase();
 
   const checks = [];
-  let pass = true;
-  let dexNeeded = false;
+  let pass = true, dexNeeded = false;
   const failReasons = [];
 
-  // Serology
   const serOk = serology === 'Non-Reactive';
   checks.push({ label: 'Serology', detail: serology || 'Not specified', status: serOk ? 'pass' : 'fail', badge: serOk ? 'Pass' : 'Fail' });
   if (!serOk) { pass = false; failReasons.push('positive serology'); }
 
-  // Age
   const ageOk = !isNaN(age) && age >= 26 && age <= 70;
   checks.push({ label: 'Age (26–70 yrs)', detail: isNaN(age) ? 'Not entered' : age + ' years', status: ageOk ? 'pass' : 'fail', badge: ageOk ? 'Pass' : 'Fail' });
   if (!ageOk) { pass = false; failReasons.push('age out of range'); }
 
-  // BMI
   const bmiOk = !isNaN(bmi) && bmi >= 18.5 && bmi <= 40;
   checks.push({ label: 'BMI (18.5–40)', detail: isNaN(bmi) ? 'Not entered' : bmi.toFixed(2), status: bmiOk ? 'pass' : 'fail', badge: bmiOk ? 'Pass' : 'Fail' });
   if (!bmiOk) { pass = false; failReasons.push('BMI out of range'); }
 
-  // Osteoporosis
   const osteoOk = osteo <= 3;
   if (!osteoOk) { pass = false; failReasons.push('osteoporosis factor count >3'); }
   if (osteoOk && osteo >= 1) dexNeeded = true;
@@ -260,7 +345,6 @@ function runScreening() {
   const osteoBadge = !osteoOk ? 'Fail' : osteo >= 1 ? 'DEX recommended' : 'Pass';
   checks.push({ label: 'Osteoporosis risk (≤3 factors)', detail: osteo + ' factor' + (osteo !== 1 ? 's' : '') + ' identified', status: osteoStatus, badge: osteoBadge });
 
-  // Structural
   const badStructural = structural && (
     structural.includes('lumbar') || structural.includes('sacr') ||
     structural.includes('pelv') || structural.includes('hip') || structural.includes('spine')
@@ -268,16 +352,11 @@ function runScreening() {
   checks.push({ label: 'Structural malformation', detail: val('structural') || 'Not specified', status: badStructural ? 'fail' : 'pass', badge: badStructural ? 'Fail' : 'Pass' });
   if (badStructural) { pass = false; failReasons.push('structural issue in excluded region'); }
 
-  // Render
   document.getElementById('screening-rows').innerHTML = checks.map(c => `
     <div class="screen-row">
-      <div>
-        <div class="screen-label">${c.label}</div>
-        <div class="screen-detail">${c.detail}</div>
-      </div>
+      <div><div class="screen-label">${c.label}</div><div class="screen-detail">${c.detail}</div></div>
       <span class="badge ${c.status}">${c.badge}</span>
-    </div>
-  `).join('');
+    </div>`).join('');
 
   if (pass && dexNeeded) {
     screeningResult = 'Pass - DEX scan recommended';
@@ -298,8 +377,7 @@ function runScreening() {
     val('tissueBank'), val('donorId'), '',
     val('age'), val('gender'),
     isNaN(heightIn) ? val('height') : Math.round(heightIn).toString(),
-    val('weight'),
-    isNaN(bmi) ? val('bmi') : bmi.toFixed(2),
+    val('weight'), isNaN(bmi) ? val('bmi') : bmi.toFixed(2),
     val('race'), val('location'), val('cod'),
     val('medHistory'), serology,
     val('osteoCount'), val('structural'), screeningResult
@@ -313,7 +391,7 @@ function runScreening() {
 async function writeToSheet() {
   const token = document.getElementById('token').value.trim();
   const msgEl = document.getElementById('write-msg');
-  if (!token) { msgEl.className = 'msg error'; msgEl.textContent = 'Please paste an OAuth access token first.'; return; }
+  if (!token) { showMsg('write-msg', 'error', 'Please paste an OAuth access token first.'); return; }
   const btn = document.getElementById('write-btn');
   btn.disabled = true; btn.textContent = 'Writing...';
   try {
@@ -324,30 +402,27 @@ async function writeToSheet() {
       body: JSON.stringify({ values: [rowData] })
     });
     const data = await res.json();
-    if (res.ok) {
-      msgEl.className = 'msg success';
-      msgEl.textContent = '✓ Row successfully added to your Google Sheet!';
-    } else {
-      msgEl.className = 'msg error';
-      msgEl.textContent = 'API error: ' + (data.error?.message || JSON.stringify(data));
-    }
+    if (res.ok) { showMsg('write-msg', 'success', '✓ Row successfully added to your Google Sheet!'); }
+    else { showMsg('write-msg', 'error', 'API error: ' + (data.error?.message || JSON.stringify(data))); }
   } catch(e) {
-    msgEl.className = 'msg error';
-    msgEl.textContent = 'Network error (' + e.message + '). Use "Copy row as TSV" and paste manually instead.';
+    showMsg('write-msg', 'error', 'Network error. Use "Copy row as TSV" and paste manually instead.');
   }
   btn.disabled = false; btn.textContent = '+ Add row to sheet';
 }
 
 function copyTSV() {
+  if (!rowData || rowData.length === 0) {
+    showMsg('write-msg', 'error', 'No data yet — please run screening first.');
+    return;
+  }
   const tsv = rowData.join('\t');
   navigator.clipboard.writeText(tsv).then(() => {
-    const msgEl = document.getElementById('write-msg');
-    msgEl.className = 'msg success';
-    msgEl.textContent = '✓ Copied! Click the first empty cell in your sheet and paste.';
+    showMsg('write-msg', 'success', '✓ Copied! Click the first empty cell in your sheet and paste.');
   }).catch(() => {
+    // Fallback: show a selectable text area
     const msgEl = document.getElementById('write-msg');
-    msgEl.className = 'msg error';
-    msgEl.textContent = 'Could not copy automatically — please copy this manually: ' + rowData.join('\t');
+    msgEl.className = 'msg info';
+    msgEl.innerHTML = 'Clipboard blocked. Select all the text below and copy manually (Ctrl+A, Ctrl+C):<br><textarea style="width:100%;margin-top:8px;font-size:12px;font-family:monospace;height:60px;border:1px solid #ddd;border-radius:6px;padding:6px;" onclick="this.select()">' + tsv.replace(/</g,'&lt;') + '</textarea>';
   });
 }
 </script>
